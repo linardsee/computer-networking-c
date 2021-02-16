@@ -6,9 +6,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
-#include <pthread.h>
 #include <sys/types.h>
-#include <signal.h>
 #include <sys/epoll.h>
 
 #define MAX_CLIENTS 100
@@ -107,6 +105,8 @@ void send_message(char *s, int uid)
 		}
 	}
 }
+sprintf(buffer, "Server: %s\n", message);
+                        send_all(buffer);
 
 
 // Send message to all clients
@@ -128,8 +128,8 @@ void send_all(char *s)
 int handle_client_name(client_t * client)
 {
         char name[32];
-        char buff_out[BUFFER_SZ];
-        int leave = 0;
+        char buff_out1[BUFFER_SZ];
+        int leave;
 
         if(recv(client->sockfd, name, 32, 0) <= 0 || strlen(name) <  2 || strlen(name) >= 32-1)
         {
@@ -139,14 +139,14 @@ int handle_client_name(client_t * client)
         else
         {
                 strcpy(client->name, name);
-                sprintf(buff_out, "%s has joined\n", client->name);
-                printf("%s", buff_out);
+                sprintf(buff_out1, "%s has joined\n", client->name);
+                printf("%s", buff_out1);
                 str_overwrite_stdout();
                 //send_message(buff_out, client->uid);
-        	send_all(buff_out);
+        	send_all(buff_out1);
 	}
 
-        bzero(buff_out, BUFFER_SZ);
+        bzero(buff_out1, BUFFER_SZ);
 
         return leave;
 }
@@ -154,9 +154,10 @@ int handle_client_name(client_t * client)
 
 int main(int argc, char **argv)
 {
-	leave_flag = 0;
-	client_t* cli;
+	int leave_flag = 0;
+	client_t* cli = NULL;
 	char buff_out[BUFFER_SZ];	
+	char buff[BUFFER_SZ+32];
 
 	if(argc != 2)
         {
@@ -217,11 +218,12 @@ int main(int argc, char **argv)
 	while(1)
 	{
 		num_ready = epoll_wait(epfd, events, MAX_EPOLL_EVENTS, 30000);
-		
+		int iterator = 0;	
 		for(int i = 0; i < num_ready; i++)
 		{
 			if(events[i].data.fd == listenfd)
 			{
+				// LISTEN EVENTS
 				socklen_t clilen = sizeof(cli_addr);
         	        	connfd = accept(listenfd, (struct sockaddr*)&cli_addr, &clilen);
 
@@ -234,7 +236,7 @@ int main(int argc, char **argv)
 				}
 
 				// Allocate new client
-				cli = (client_t *)malloc(sizeof(client_t));
+				client_t* cli = (client_t *)malloc(sizeof(client_t));
                 		cli->address = cli_addr;
                 		cli->sockfd = connfd;
                 		cli->uid = uid++;
@@ -246,46 +248,79 @@ int main(int argc, char **argv)
 				epoll_ctl(epfd, EPOLL_CTL_ADD, cli->sockfd, &event);
 
 				leave_flag = handle_client_name(cli);
-
 			}
 			else if(events[i].data.fd == 0)
 			{
-				/*
-				 *
-				 *
-				 *
-				 *
-				 */
-				 // ALL WRITE EVENTS HERE
+				// STD IN EVENTS
+        		        fgets(buff_out, BUFFER_SZ, stdin);
+	                	str_trim_lf(buff_out, BUFFER_SZ);
+				sprintf(buff, "Server: %s\n", buff_out);
+                        	send_all(buff);
+				str_overwrite_stdout();
+			
+				bzero(buff_out, BUFFER_SZ);
+				bzero(buff, BUFFER_SZ+32);
 			}
 			else
 			{
-				int iterator = 0;
-				while(iterator < MAX_CLIENTS) // check each element of clients array
+				// RECEIVE EVENTS
+				do
 				{
-					if(clients[iterator]->sockfd == events[i].data.fd)
+					if(clients[iterator] == NULL)
+						iterator++;
+					else
 					{
-						break;
+						if(clients[iterator]->sockfd == events[i].data.fd)
+						{	
+							break;
+						}
+						else
+							iterator++;
 					}
-					iterator++;
+
+				}while(iterator < MAX_CLIENTS);
+				
+				//printf("DEBUG: events[i].data.fd = %d\n", events[i].data.fd);
+				//printf("DEBUG: clients[iterator]->sockfd = %d\n", clients[iterator]->sockfd);
+				
+				if(iterator == MAX_CLIENTS)
+				{
+					printf("No client found!\n");
 				}
+				
+				
 				receive = recv(clients[iterator]->sockfd, buff_out, BUFFER_SZ, 0);
+
 				if (receive > 0)
-				{
+				{	
 					if(strlen(buff_out) > 0)
-					{	
-						send_message(buff_out, clients[iterator]->uid);
-						str_trim_lf(buff_out, strlen(buff_out));
-						printf("%s\n", buff_out);
-						str_overwrite_stdout();
+					{
+						if(strcmp(buff_out, "exit") == 0)
+						{
+							bzero(buff_out, BUFFER_SZ);
+							//printf("DEBUG: exit pressed\n");
+							sprintf(buff_out, "%s has left\n", clients[iterator]->name);
+							printf("%s", buff_out);
+							send_message(buff_out, clients[iterator]->uid);
+							str_overwrite_stdout();
+							leave_flag = 1;
+						}
+						else
+						{
+							send_message(buff_out, clients[iterator]->uid);
+							str_trim_lf(buff_out, strlen(buff_out));
+							printf("%s\n", buff_out);
+							str_overwrite_stdout();
+						}
 					}
 				}
-				else if (receive == 0 || strcmp(buff_out, "exit") == 0)
+				else if (receive == 0)
 				{
+					//printf("DEBUG: Receive == 0\n");
 					sprintf(buff_out, "%s has left\n", clients[iterator]->name);
-					printf("asda sd ad%s", buff_out);
-					printf("leave flag: %d", leave_flag);
+					printf("%s", buff_out);
 					send_message(buff_out, clients[iterator]->uid);
+					str_overwrite_stdout();
 					leave_flag = 1;
 				}
 				else
@@ -296,17 +331,20 @@ int main(int argc, char **argv)
 
 				bzero(buff_out, BUFFER_SZ);
 				
-				if(leave_flag)
-				{
-					leave_flag = 0;
-					close(clients[iterator]->sockfd);
-					queue_remove(clients[iterator]->uid);
-					printf("Releasing %s", clients[iterator]->name);
-					free(clients[iterator]);
-					cli_count--;
-				}
 			}
-		}// for loop ends	
+
+			if(leave_flag == 1)
+			{
+				//printf("DEBUG: leave_flag = 1, exiting\n");
+				leave_flag = 0;
+				close(clients[iterator]->sockfd);
+				//queue_remove(clients[iterator]->uid);
+				//printf("Releasing %s", clients[iterator]->name);
+				free(clients[iterator]);
+				clients[iterator] = NULL;
+				cli_count--;
+			}
+		}// for loop ends
 	}// while 1 ends
 	return EXIT_SUCCESS;
 } // int main ends

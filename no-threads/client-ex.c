@@ -135,9 +135,10 @@ int main(int argc, char **argv)
 
 				if (strcmp(message, "exit") == 0)
 				{
-					//flag = 1;
+					flag = 1;
+					sprintf(buffer, "%s", message);
 					send(sockfd, buffer, strlen(buffer), 0);
-					//break;
+					break;
 				}
 				else
 				{
