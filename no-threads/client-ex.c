@@ -38,8 +38,8 @@ int main(int argc, char **argv)
 	int flag = 0;
 	char name[32];
 	int num_ready;
-	char message[LENGTH] = {};
-        char buffer[LENGTH + 32] = {};
+	char message[LENGTH];
+        char buffer[LENGTH + 40];
 
 
 	if(argc != 2)

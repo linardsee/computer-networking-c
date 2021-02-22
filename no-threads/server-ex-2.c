@@ -105,8 +105,6 @@ void send_message(char *s, int uid)
 		}
 	}
 }
-sprintf(buffer, "Server: %s\n", message);
-                        send_all(buffer);
 
 
 // Send message to all clients
