@@ -5,7 +5,7 @@ CFLAGS=-I.
 
 all: server client
 
-server: server.o Csocket.o
+server: server.o Csocket.o CClient.o
 	$(CC) -o $@ $^ $(CFLAGS)
 
 client: client.o Csocket.o
@@ -18,6 +18,9 @@ client.o: client.cpp Csocket.h
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 Csocket.o: Csocket.cpp Csocket.h
+	$(CC) -c -o $@ $< $(CFLAGS)
+
+CClient.o: CClient.cpp CClient.h
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 clean:

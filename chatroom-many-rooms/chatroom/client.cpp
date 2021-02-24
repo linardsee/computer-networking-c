@@ -23,6 +23,9 @@ int main(int argc, char** argv)
 		cout << "Error\n";
 	else
 		cout << "Connection successful!\n";
+	
+	char name[32] = "pipis";
+	send(sockfd, name, 32, 0);
 
 	return 0;
 }
