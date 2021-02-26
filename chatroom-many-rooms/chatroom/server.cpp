@@ -88,14 +88,14 @@ int main(int argc, char** argv)
 	while(1)
 	{
 		num_ready = epoll_wait(epfd, events, MAX_EPOLL_EVENTS, 30000);
-
+		cout << "Num ready: " << num_ready << endl;
 		for(int i = 0; i < num_ready; i++)
 		{
+			cout << "i =  " << i << endl;
 			if(events[i].data.fd == listenfd)
 			{
 				// Connection events
 				connfd = server.Accept();
-				cout << "Connected\n";
 				// here we need to limit client quantity and reject if necessary
 				if(connfd == -1)
 				{
@@ -111,10 +111,10 @@ int main(int argc, char** argv)
 					event.data.fd = client->getSockfd();
 					epoll_ctl(epfd, EPOLL_CTL_ADD, client->getSockfd(), &event);
 
-					handleClientName(client, OfflineClients, it_off);
+					//handleClientName(client, OfflineClients, it_off);
 					
 					// Send room names
-
+					cout << "Connected\n";
 				}
 			}
 			else if(events[i].data.fd == 0)
@@ -146,7 +146,8 @@ int main(int argc, char** argv)
 				//	cout << "Received a single message\n";
 				//else
 				//	cout << "Received message which must continue\n";
-	
+				
+			/*	
 				char number = 0;
 				while(number >= 0)
 				{
@@ -163,6 +164,12 @@ int main(int argc, char** argv)
 					}
 
 				}
+			*/
+				cout << "descriptor: " << events[i].data.fd << endl;
+				cout << "Receiveign\n";
+				char number = server.ReceiveDataAck(events[i].data.fd, rcv_buff); 
+				cout << "Data received: " << rcv_buff << endl;
+				bzero(rcv_buff, RCV_BUFF_SIZE);
 			}
 		}
 	}

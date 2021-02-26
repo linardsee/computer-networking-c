@@ -1,4 +1,4 @@
-
+#include <unistd.h>
 #include <iostream>
 #include "Csocket.h"
 #include <vector>
@@ -25,8 +25,8 @@ int main(int argc, char** argv)
 	else
 		cout << "Connection successful!\n";
 	
-	char name[32] = "pipis";
-	send(sockfd, name, 32, 0);
+	//char name[32] = "Linards";
+	//send(sockfd, name, 32, 0);
 /*
 	char test[100] = "test msg asda sdasd ";
 	send(sockfd, test, 100, 0);
@@ -39,9 +39,7 @@ int main(int argc, char** argv)
 
 */
 
-	char test[32] = "hello world test";
 	char test2[32] = "apelsins ir garsigs";
-	char test3[32] = "jogur";
 
 	vector <char*> vec_test;
 /*	
@@ -58,20 +56,25 @@ int main(int argc, char** argv)
 	}
 */
 
-
+/*
 	char ack_msg;
-        ack_msg	= client.SendDataAck(sockfd, test, 3);
+        ack_msg	= client.SendDataAck(sockfd, test, 55);
 	cout << "ACK number: " << (int)ack_msg << endl;
 
 
- 	ack_msg	= client.SendDataAck(sockfd, test2, 2);
+ 	ack_msg	= client.SendDataAck(sockfd, test2, 56);
 	cout << "ACK number: " << (int)ack_msg << endl;
 	
 
-	ack_msg	= client.SendDataAck(sockfd, test3, 1);
+	ack_msg	= client.SendDataAck(sockfd, test3, 57);
 	cout << "ACK number: " << (int)ack_msg << endl;
 
-
-
+*/
+	char len[3];
+	len[0] = strlen(test2);
+	char ack_msg = client.SendDataAck(sockfd, len, 1);
+	char ack_msg1 = client.SendDataAck(sockfd, test2, 1);
+	close(sockfd);
+	//shutdown(sockfd, SHUT_RDWR);
 	return 0;
 }

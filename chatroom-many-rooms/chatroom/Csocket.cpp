@@ -120,49 +120,108 @@ int Csocket::Accept()
 
 char Csocket::SendDataAck(int sockfd, char* buff, char seqNum)
 {
-	cout << "buff len = " << strlen(buff) << endl;
+	//cout << "buff len = " << strlen(buff) << endl;
 	int len = strlen(buff);
 	buff[len] = seqNum; // Add message number in the end
+	len = strlen(buff);
 	char ack[1];
-	
+	int bytesSent, bytesReceived;	
+
 	cout << "After adding buff len = " << strlen(buff) << endl;
-	send(sockfd, buff, strlen(buff), 0);
+	cout << "Message after adding ending: " << buff << endl;
+	bytesSent = send(sockfd, buff, strlen(buff), 0);
+	cout << "bytesSent = " << bytesSent << " and len = " << len << endl;
 	while(1)
 	{
-		if( recv(sockfd, ack, 1, 0))
+		bytesReceived = recv(sockfd, ack, 1, 0);
+
+		if(bytesReceived == 1)
 		{
 			if(ack[0] == seqNum)
 			{
 				cout << "Received ACK: " << (int)seqNum << endl;
-			}
-			else
-				ack[0] = -1;
-			break;
+				if(bytesSent == len)
+				{
+					break;	
+				}
+				else
+				{
+					cout << "Here" << endl;
+					bytesSent = send(sockfd, buff+bytesSent, strlen(buff), 0);
+				}
+			}	
 		}
 	}
 
 	return ack[0];
+/*
+	char len = strlen(buff);
+	char sent;
+	
+	//cout << "Buffer: " << buff << endl;
+	sent = send(sockfd, buff, strlen(buff), 0);
+	cout << "Successfully sent\n";
+
+	while(sent != len)
+	{
+		cout << "Partly sent. Sending again.\n";
+		sent = send(sockfd, buff+sent, strlen(buff+sent), 0);
+	}
+
+	return len; */
 }
 
 char Csocket::ReceiveDataAck(int sockfd, char* buff)
 {
 	char rcvData[RCV_BUFF_SIZE];
 	char ack[1];	
-	cout << "Size of rcvData = " << sizeof(rcvData) << endl;
+	int receiveBytes, sentBytes;
+	
+	receiveBytes = recv(sockfd, rcvData, RCV_BUFF_SIZE, 0);
+	
+	if(receiveBytes <= 0)
+	{
+	}
+	else
+	{
+	ack[0] = rcvData[strlen(rcvData)-1];
+	strncpy(buff, rcvData, receiveBytes-1);	
+	send(sockfd, ack, 1, 0);
+	}
+	return ack[0];
+
+	/*
+	char rcvData[RCV_BUFF_SIZE];
+	char normalData[RCV_BUFF_SIZE];
+	int receive;
+	char msgLen;
+
+	receive = recv(sockfd, rcvData, RCV_BUFF_SIZE, 0);
+	
+	if(receive)
+	{
 	while(1)
 	{
-		if(recv(sockfd, rcvData, RCV_BUFF_SIZE, 0) )
+		if(receive == 1)
 		{
-			cout << "Received data before strncpy: " << rcvData << endl;
-
-			ack[0] = rcvData[strlen(rcvData)-1];	
-			strncpy(buff, rcvData, strlen(rcvData));
-			cout << "Received data: " << buff << endl;
-			send(sockfd, ack, 1, 0);
-			
+			msgLen = rcvData[0];
+			receive = recv(sockfd, rcvData, RCV_BUFF_SIZE, 0);
+		}
+		else if(receive == msgLen)
+		{
+			cout << "Received all buffer\n";
+			cout << "msgLen = " << receive << endl;
+			cout << "Received data before copying: " << rcvData << endl;
+			strncpy(normalData, rcvData, receive);
+			cout << "The data: " << normalData << endl;
 			break;
 		}
-	}	
-
-	return ack[0];
+		else
+		{
+			cout << "Partly received, waiting again\n";
+			msgLen -= receive;
+		}
+	}
+	}
+	return msgLen;*/
 }
