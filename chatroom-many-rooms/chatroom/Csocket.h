@@ -3,6 +3,10 @@
 #include<netinet/in.h>
 #include<arpa/inet.h>
 #include<errno.h>
+#include<string.h>
+
+#define RCV_BUFF_SIZE 512 
+
 using namespace std;
 
 class Csocket
@@ -17,8 +21,8 @@ class Csocket
 		int ConnectClient(int port);
 		int Accept();	
 		//Disconnect();
-		//SendData();
-		//ReceiveData();
+		char SendDataAck(int sockfd, char* buff, char seqNum);
+		char ReceiveDataAck(int sockfd, char* buff);
 	private:
 		struct sockaddr_in serv_addr;
 		struct sockaddr_in cli_addr;

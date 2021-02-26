@@ -117,3 +117,52 @@ int Csocket::Accept()
 
 	return connfd;
 }
+
+char Csocket::SendDataAck(int sockfd, char* buff, char seqNum)
+{
+	cout << "buff len = " << strlen(buff) << endl;
+	int len = strlen(buff);
+	buff[len] = seqNum; // Add message number in the end
+	char ack[1];
+	
+	cout << "After adding buff len = " << strlen(buff) << endl;
+	send(sockfd, buff, strlen(buff), 0);
+	while(1)
+	{
+		if( recv(sockfd, ack, 1, 0))
+		{
+			if(ack[0] == seqNum)
+			{
+				cout << "Received ACK: " << (int)seqNum << endl;
+			}
+			else
+				ack[0] = -1;
+			break;
+		}
+	}
+
+	return ack[0];
+}
+
+char Csocket::ReceiveDataAck(int sockfd, char* buff)
+{
+	char rcvData[RCV_BUFF_SIZE];
+	char ack[1];	
+	cout << "Size of rcvData = " << sizeof(rcvData) << endl;
+	while(1)
+	{
+		if(recv(sockfd, rcvData, RCV_BUFF_SIZE, 0) )
+		{
+			cout << "Received data before strncpy: " << rcvData << endl;
+
+			ack[0] = rcvData[strlen(rcvData)-1];	
+			strncpy(buff, rcvData, strlen(rcvData));
+			cout << "Received data: " << buff << endl;
+			send(sockfd, ack, 1, 0);
+			
+			break;
+		}
+	}	
+
+	return ack[0];
+}

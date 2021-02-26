@@ -6,6 +6,7 @@
 #include <cstring>
 
 #define MAX_EPOLL_EVENTS 64
+#define RCV_BUFF_SIZE 512
 
 /* GLOBAL VARIABLES */
 
@@ -44,6 +45,8 @@ void handleClientName(CClient* theClient, list<CClient*>& theOffList, list<CClie
 	else
 	{
 	}
+
+	cout << theClient->getClientName() << " connected\n";
 }
 
 
@@ -55,7 +58,9 @@ int main(int argc, char** argv)
 		return EXIT_FAILURE;
 	}
 	int port = atoi(argv[1]);
-	
+	char rcv_buff[RCV_BUFF_SIZE];
+	string rcvStr;
+
 	list<CClient*> OnlineClients;
 	list<CClient*> OfflineClients;
 	list<CClient*>::iterator it_on;
@@ -65,7 +70,7 @@ int main(int argc, char** argv)
 	// Create and init the listen socket
 	Csocket server;
 	int listenfd = server.InitServer(port);	
-	int connfd;
+	int connfd, receive;
 	cout << "Descriptor created: " << listenfd << endl;
 	
 	int num_ready;
@@ -115,10 +120,49 @@ int main(int argc, char** argv)
 			else if(events[i].data.fd == 0)
 			{
 				// Input events
+				
 			}
 			else
 			{
 				// Receive events
+				/*receive = recv(events[i].data.fd, rcv_buff, RCV_BUFF_SIZE, 0);
+				if(receive > 0)
+				{
+					// Message received
+					rcvStr = rcv_buff;
+					cout << "The received message is: " << rcvStr << endl;
+					cout << rcvStr.size() << endl;
+					cout << rcvStr[rcvStr.size()-1] << endl;
+					cout << sizeof(rcv_buff) << endl;
+					cout << rcv_buff[rcvStr.size()-2] << " " << rcv_buff[rcvStr.size()-1] << endl; 
+					if( rcvStr[rcvStr.size()-1] == '\0')
+						cout << "Message wont continue\n";
+					else
+						cout << "This is not the end\n";					
+				}
+				bzero(rcv_buff, RCV_BUFF_SIZE);
+				*/
+				//if (server.ReceiveDataAck(events[i].data.fd) == 0 )
+				//	cout << "Received a single message\n";
+				//else
+				//	cout << "Received message which must continue\n";
+	
+				char number = 0;
+				while(number >= 0)
+				{
+					number = server.ReceiveDataAck(events[i].data.fd, rcv_buff); 
+					if( number >= 0)
+					{
+						cout << "Sequence number = " << (int)number << endl;
+						cout << "Content of the message = " << rcv_buff << endl;
+						cout << endl;
+						if(!number)
+							break;
+						bzero(rcv_buff, RCV_BUFF_SIZE);
+ 
+					}
+
+				}
 			}
 		}
 	}
