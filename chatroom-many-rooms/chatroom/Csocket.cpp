@@ -2,6 +2,12 @@
 #include "Csocket.h"
 
 
+void Csocket::SetTimeout(unsigned int theTimeout)
+{
+	timeout.tv_sec = theTimeout;
+	timeout.tv_usec = 0;
+}	
+
 int Csocket::InitServer(char* ip, int port)
 {
 	int descriptor = socket(AF_INET, SOCK_STREAM, 0);
@@ -10,13 +16,31 @@ int Csocket::InitServer(char* ip, int port)
 	serv_addr.sin_family = AF_INET;
         serv_addr.sin_addr.s_addr = inet_addr(ip);
         serv_addr.sin_port = htons(port);
+	
+	Csocket::SetTimeout(5);
 
-	if(setsockopt(descriptor, SOL_SOCKET,(SO_REUSEPORT | SO_REUSEADDR),(char*)&option,sizeof(option)) < 0)
+
+	if(setsockopt(descriptor, SOL_SOCKET,(SO_REUSEPORT | SO_REUSEADDR),(char*)&option, sizeof(option)) < 0)
         {
 		std::cerr << "ERROR: setsockopt failed!";
                // perror("ERROR: setsockopt failed");
                 return EXIT_FAILURE;
         }
+	
+	if(setsockopt(descriptor, SOL_SOCKET, SO_RCVTIMEO,(char*)&timeout, sizeof(timeout)) < 0)
+        {
+		std::cerr << "ERROR: setsockopt failed!";
+               // perror("ERROR: setsockopt failed");
+                return EXIT_FAILURE;
+        }
+
+	if(setsockopt(descriptor, SOL_SOCKET, SO_SNDTIMEO,(char*)&timeout, sizeof(timeout)) < 0)
+        {
+		std::cerr << "ERROR: setsockopt failed!";
+               // perror("ERROR: setsockopt failed");
+                return EXIT_FAILURE;
+        }
+
 
         /* Bind */
         if(bind(descriptor, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0)
@@ -50,12 +74,29 @@ int Csocket::InitServer(int port)
         serv_addr.sin_addr.s_addr = inet_addr(ip);
         serv_addr.sin_port = htons(port);
 
+	Csocket::SetTimeout(5);
+
 	if(setsockopt(descriptor, SOL_SOCKET,(SO_REUSEPORT | SO_REUSEADDR),(char*)&option,sizeof(option)) < 0)
         {
 		std::cerr << "ERROR: setsockopt failed!";
                // perror("ERROR: setsockopt failed");
                 return EXIT_FAILURE;
         }
+
+	if(setsockopt(descriptor, SOL_SOCKET, SO_RCVTIMEO,(char*)&timeout, sizeof(timeout)) < 0)
+        {
+		std::cerr << "ERROR: setsockopt failed!";
+               // perror("ERROR: setsockopt failed");
+                return EXIT_FAILURE;
+        }
+
+	if(setsockopt(descriptor, SOL_SOCKET, SO_SNDTIMEO,(char*)&timeout, sizeof(timeout)) < 0)
+        {
+		std::cerr << "ERROR: setsockopt failed!";
+               // perror("ERROR: setsockopt failed");
+                return EXIT_FAILURE;
+        }
+
 
         /* Bind */
         if(bind(descriptor, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0)
@@ -118,110 +159,75 @@ int Csocket::Accept()
 	return connfd;
 }
 
-char Csocket::SendDataAck(int sockfd, char* buff, char seqNum)
+int Csocket::SendMessage(int sockfd, char* buff)
 {
-	//cout << "buff len = " << strlen(buff) << endl;
-	int len = strlen(buff);
-	buff[len] = seqNum; // Add message number in the end
-	len = strlen(buff);
-	char ack[1];
-	int bytesSent, bytesReceived;	
+	int msgSent = 0;
+	uint8_t len[2] = {};
+	uint16_t length = strlen(buff);
+	unsigned int msgLeft = length;
 
-	cout << "After adding buff len = " << strlen(buff) << endl;
-	cout << "Message after adding ending: " << buff << endl;
-	bytesSent = send(sockfd, buff, strlen(buff), 0);
-	cout << "bytesSent = " << bytesSent << " and len = " << len << endl;
-	while(1)
+	len[0] = (length & 0xFF00) >> 8;
+	len[1] = length & 0xFF;
+
+	while(msgSent != 2)
 	{
-		bytesReceived = recv(sockfd, ack, 1, 0);
-
-		if(bytesReceived == 1)
-		{
-			if(ack[0] == seqNum)
-			{
-				cout << "Received ACK: " << (int)seqNum << endl;
-				if(bytesSent == len)
-				{
-					break;	
-				}
-				else
-				{
-					cout << "Here" << endl;
-					bytesSent = send(sockfd, buff+bytesSent, strlen(buff), 0);
-				}
-			}	
-		}
+		msgSent = send(sockfd, len, sizeof(len), 0);
+		if(msgSent == -1)
+			return -1;
 	}
-
-	return ack[0];
-/*
-	char len = strlen(buff);
-	char sent;
 	
-	//cout << "Buffer: " << buff << endl;
-	sent = send(sockfd, buff, strlen(buff), 0);
-	cout << "Successfully sent\n";
+	/*debug*/ cout << "Length sent\n";
+	cout << "length before reconstructing: " << length << endl;
+	length = 0;
+	length |= (len[0] << 8) | len[1];
+	cout << "lenght after reconstructing: " << length << endl;
+	
+	msgSent = 0;
 
-	while(sent != len)
+	while(msgLeft > 0)
 	{
-		cout << "Partly sent. Sending again.\n";
-		sent = send(sockfd, buff+sent, strlen(buff+sent), 0);
+		msgSent = send(sockfd, buff + length - msgLeft, strlen(buff + length - msgLeft), 0);
+		msgLeft -= msgSent;
+		
+		if(msgSent == -1)
+			return -1;
 	}
 
-	return len; */
+	return 1;
 }
 
-char Csocket::ReceiveDataAck(int sockfd, char* buff)
+int Csocket::ReceiveMessage(int sockfd, char* buff)
 {
-	char rcvData[RCV_BUFF_SIZE];
-	char ack[1];	
-	int receiveBytes, sentBytes;
-	
-	receiveBytes = recv(sockfd, rcvData, RCV_BUFF_SIZE, 0);
-	
-	if(receiveBytes <= 0)
-	{
-	}
-	else
-	{
-	ack[0] = rcvData[strlen(rcvData)-1];
-	strncpy(buff, rcvData, receiveBytes-1);	
-	send(sockfd, ack, 1, 0);
-	}
-	return ack[0];
+	int msgRcvd = 0;
+	unsigned int msgLeft = 0;
+	uint8_t len[2] = {};
+	uint16_t length = 0;
+	char tempBuff[RCV_BUFF_SIZE] = {};
 
-	/*
-	char rcvData[RCV_BUFF_SIZE];
-	char normalData[RCV_BUFF_SIZE];
-	int receive;
-	char msgLen;
+	msgRcvd = recv(sockfd, len, sizeof(len), MSG_WAITALL); // blocking function, returns only when all bytes have been received
+	if(msgRcvd == -1)
+		return -1;
+	if(msgRcvd == 0)
+		return 0;
 
-	receive = recv(sockfd, rcvData, RCV_BUFF_SIZE, 0);
+	length |= (len[0] << 8) | len[1];
+	cout << "Length received: " << length << endl;
 	
-	if(receive)
+	msgRcvd = 0;
+	msgLeft = length;
+	
+	while(msgLeft > 0)
 	{
-	while(1)
-	{
-		if(receive == 1)
-		{
-			msgLen = rcvData[0];
-			receive = recv(sockfd, rcvData, RCV_BUFF_SIZE, 0);
-		}
-		else if(receive == msgLen)
-		{
-			cout << "Received all buffer\n";
-			cout << "msgLen = " << receive << endl;
-			cout << "Received data before copying: " << rcvData << endl;
-			strncpy(normalData, rcvData, receive);
-			cout << "The data: " << normalData << endl;
-			break;
-		}
-		else
-		{
-			cout << "Partly received, waiting again\n";
-			msgLen -= receive;
-		}
+		msgRcvd = recv(sockfd, tempBuff, sizeof(tempBuff), 0);
+		if(msgRcvd == -1)
+			return -1;
+		if(msgRcvd == 0)
+			return 0;
+		
+		msgLeft -= msgRcvd;
+		strcat(buff, tempBuff);
+		bzero(tempBuff, RCV_BUFF_SIZE);
 	}
-	}
-	return msgLen;*/
+
+	return 1;
 }

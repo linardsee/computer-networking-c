@@ -101,6 +101,7 @@ int main(int argc, char **argv)
 	while (1)
 	{
 		num_ready = epoll_wait(epfd, events, 64, 10000);
+		printf("NUm ready: %d", num_ready);
 		//num2_ready = epoll_wait(rfd, events, 64, 10000);
 		//printf("File descriptor: %d", events[1].data.fd);
 

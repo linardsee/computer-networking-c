@@ -14,6 +14,7 @@ class Csocket
 	public:
 		Csocket(){};
 		~Csocket(){};
+		void SetTimeout(unsigned int theTimeout);
 		int InitServer(char* ip, int port);
 		int InitServer(int port);
 		int InitClient();
@@ -21,10 +22,13 @@ class Csocket
 		int ConnectClient(int port);
 		int Accept();	
 		//Disconnect();
-		char SendDataAck(int sockfd, char* buff, char seqNum);
-		char ReceiveDataAck(int sockfd, char* buff);
-	private:
+		//char SendDataAck(int sockfd, char* buff, char seqNum);
+		//char ReceiveDataAck(int sockfd, char* buff);
+		int SendMessage(int sockfd, char* buff);
+		int ReceiveMessage(int sockfd, char* buff);
+		private:
 		struct sockaddr_in serv_addr;
 		struct sockaddr_in cli_addr;
+		struct timeval timeout;
 		int socket_fd=0;
 };
