@@ -1,15 +1,18 @@
 #include <unistd.h>
 #include <sys/epoll.h>
 #include <iostream>
-#include "Csocket.h"
+#include <cstdlib>
 #include <string>
 #include <vector>
+#include "Csocket.h"
 
 
 #define MAX_EPOLL_EVENTS 64
 #define READ_SIZE 1024
+#define MAX_BUFF_SIZE 1024
 
 using namespace std;
+
 
 void printStartWindow()
 {
@@ -20,6 +23,31 @@ void printStartWindow()
 	cout << "CREATE -> create a new room\n";
 	cout << "HELP -> print all commands\n";
 	cout << "EXIT -> exit this application\n";
+}
+
+void handleNameReply(string buff, string& theName, string& theRoomName)
+{
+	if( buff.compare("ERROR") == 0)
+	{
+		cout << "Error: bad login name\n";
+		exit(EXIT_FAILURE);
+	}
+	
+	if( buff.compare("OK") == 0)
+	{
+		cout << "New client connected successfully\n";
+		buff = "";
+		cout << "===== WELCOME TO CHATROOM =====\n";
+		cout << endl;
+		printStartWindow();
+		cout << endl;
+	}
+	
+	if( (buff.compare("OK") != 0) && (buff.compare("ERROR") != 0) )
+	{
+		theRoomName = buff;
+		cout << theName << "@" << theRoomName << ">" << flush;
+	}
 }
 
 int checkIfRequest(string str)
@@ -66,7 +94,6 @@ int checkIfRequest(string str)
 	return state;
 }
 
-
 int main(int argc, char** argv)
 {
 	if(argc != 2)
@@ -77,9 +104,15 @@ int main(int argc, char** argv)
 	int port = atoi(argv[1]);
 
 	Csocket client;
-	string inputStr;
+	string inputStr, buffStr, currentRoom, userName;
 	char inputChar[32] = {};
+	char dataBuff[MAX_BUFF_SIZE] = {};
 	int req;
+
+	cout << "> Enter your login name: ";
+	getline(cin, inputStr);
+	userName = inputStr;
+	strcpy(inputChar, inputStr.c_str());
 
 	int sockfd = client.InitClient();
 	cout << "Descriptor created: " << sockfd << endl;
@@ -101,21 +134,22 @@ int main(int argc, char** argv)
         event.data.fd = sockfd;
         epoll_ctl(epfd, EPOLL_CTL_ADD, sockfd, &event);
 
-	cout << "> Enter your name to login: ";
-	getline(cin, inputStr);
-	strcpy(inputChar, inputStr.c_str());
-
+	
 	if(client.SendMessage(sockfd, inputChar) == -1)
 	{
-		cout << "Error: sending name";
+		cout << "Error: sending name\n";
 		return 0;
 	}
 
-
-	cout << "===== WELCOME TO CHATROOM =====\n";
-	cout << endl;
-	printStartWindow();
-      	cout << endl;	
+	if(client.ReceiveMessage(sockfd, dataBuff) == -1)
+	{
+		cout << "Error: receiving name accept\n";
+		return 0;
+	}
+	
+	buffStr = dataBuff;
+	bzero(dataBuff, MAX_BUFF_SIZE);
+	handleNameReply(buffStr, userName, currentRoom);
 
 	while(1)
 	{

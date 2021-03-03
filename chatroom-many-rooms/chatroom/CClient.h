@@ -18,8 +18,8 @@ class CClient
                 void setSockfd(const int socketfd);
                 string getClientName(void);
                 void setClientName(const string theName);
-                string getRoomName(void);
-                void setRoomName(const string theRoom);
+                string getLastRoom(void);
+                void setLastRoom(const string theRoom);
                 void setAddress(struct sockaddr_in theAddress);
 
         private:

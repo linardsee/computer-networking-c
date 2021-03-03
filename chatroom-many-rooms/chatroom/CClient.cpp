@@ -40,12 +40,12 @@ void CClient::setClientName(const string theName)
 	clientName = theName;
 }
 
-string CClient::getRoomName(void)
+string CClient::getLastRoom(void)
 {
 	return roomName;
 }
 
-void CClient::setRoomName(const string theRoom)
+void CClient::setLastRoom(const string theRoom)
 {
 	roomName = theRoom;
 }

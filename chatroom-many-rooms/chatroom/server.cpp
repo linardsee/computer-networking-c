@@ -1,58 +1,158 @@
 
 #include "Csocket.h"
 #include "CClient.h"
+#include "CRoom.h"
 #include <list>
 #include <sys/epoll.h>
 #include <cstring>
 #include <unistd.h>
+#include <cstdlib>
 
 #define MAX_EPOLL_EVENTS 64
-#define RCV_BUFF_SIZE 512
+#define MAX_BUFF_SIZE 1024
 
 /* GLOBAL VARIABLES */
+list<CClient*> OnlineClients;
+list<CClient> OfflineClients;
+list<CClient*>::iterator it_on;
+list<CClient>::iterator it_off;
+list<CRoom> Rooms;
+list<CRoom>::iterator it_room;
+
 
 using namespace std;
 
-void handleClientName(Csocket &theServer, CClient* theClient, list<CClient*>& theOffList, list<CClient*>::iterator& it_offlist)
+int handleReceiveMsg(string& recvStr, int sockfd)
 {
-	char theName[32] = {};
-	int state = 0;
 
-	if( theServer.ReceiveMessage(theClient->getSockfd(), theName) == -1 )
-		cout << "Error receiving client name\n";
-		// Need to handle
-
-	if( strlen(theName) <  2 || strlen(theName) >= 32-1)
-        {
-		cout << "Bad name, exit\n";
-		// Need to handle 
-        }
+	if( recvStr.compare("JOIN") == 0 )
+	{
+		if( server.ReceiveMessage(sockfd, rcv_buff) == -1 )
+		{
+			cout << "Error: receiving JOIN argument\n";
+			return -1;
+		}
+		//Find this room in list if it is there
+		//Increment this room member count
+		//Decrement previous room member count
+		//Change Client's active room
+		//Send answer to the client
+	}
+	else if( recvStr.compare("SHOW_ROOMS") == 0 )
+	{
+		// send list of rooms
+	}
+	else if( recvStr.compare("CREATE") == 0 )
+	{
+		// Receive routine
+		// Check if name is unique
+		// Add to room list
+		// Increment this room member count
+		// Change clients active room
+		// send answer to the client
+	}
 	else
 	{
-		//Check the offline list
-		for(it_offlist = theOffList.begin(); it_offlist != theOffList.end(); ++it_offlist)
+		// standard messages
+		// broadcast to other clients
+	}
+
+}
+
+int handleClientName(Csocket &theServer, CClient* theClient, list<CClient*>& theOnList, list<CClient*>::iterator& it_on, list<CClient>& theOffList, list<CClient>::iterator& it_off)
+{
+	char theName[32] = {};
+	char sendBuff[MAX_BUFF_SIZE] = {'\0'};
+	string nameStr;
+	int state = 0;
+	int receive = 0;
+	
+	// Get the name string
+	while(receive == 0)
+	{
+		receive = theServer.ReceiveMessage(theClient->getSockfd(), theName);
+		if( receive == -1 )
 		{
-			if( ((*it_offlist)->getClientName()).compare(theName) == 0)
+			cout << "Error: receiving client's name\n";
+			return -1;
+		}	
+	}
+	nameStr = theName;
+	
+	// Check the contents of name string
+	if( (nameStr.length() < 2) || (nameStr.length() >= 31) )
+	{
+		cout << "Login size is not valid\n";
+		strcpy(sendBuff, "ERROR");
+		if( theServer.SendMessage(theClient->getSockfd(), sendBuff) == -1 )
+		{
+			cout << "Error: sending error reply\n";
+			return -1;
+		}
+		close(theClient->getSockfd());
+		delete theClient;
+		bzero(sendBuff, MAX_BUFF_SIZE);
+		return 0;
+	}
+	else
+	{
+		// First check online list to avoid collision on same login names
+		for(it_on = theOnList.begin(); it_on != theOnList.end(); ++it_on)
+		{
+			if( (*it_on)->getClientName().compare(nameStr) == 0 )
 			{
-				cout << "The name is already registered!\n";
-				// Copy info from offline to online	
-				state = 1;
+				strcpy(sendBuff, "ERROR");
+				if( theServer.SendMessage(theClient->getSockfd(), sendBuff) == -1 )
+				{
+					cout << "Error: sending error reply\n";
+					return -1;
+				}
+				close(theClient->getSockfd());
+				delete theClient;
+				bzero(sendBuff, MAX_BUFF_SIZE);
+				return 0;
+			}
+		}
+	
+		// Now check the offline list to check if login name is already registered 	
+		for(it_off = theOffList.begin(); it_off != theOffList.end(); ++it_off)
+		{
+			if( (*it_off).getClientName().compare(nameStr) == 0 )
+			{
+				theOnList.push_back(theClient);
+				it_on = --theOnList.end();
+				(*it_on)->setClientName((*it_off).getClientName());
+				(*it_on)->setLastRoom((*it_off).getLastRoom());
+				// need to copy all parameters
+				
+				strcpy(sendBuff, (*it_off).getLastRoom().c_str());
+
+				if(theServer.SendMessage(theClient->getSockfd(), sendBuff) == -1 ) 
+				{
+					cout << "Error: sending error reply\n";
+					return -1;
+				}
+				
+				bzero(sendBuff, MAX_BUFF_SIZE);
+				return 1;	
 			}
 		}
 
-		// Also need to check online list, because of conflicts
+		theOnList.push_back(theClient);
+		theOffList.push_back(*theClient);
+		
+		strcpy(sendBuff, "OK");
+		if(theServer.SendMessage(theClient->getSockfd(), sendBuff) == -1 ) 
+		{
+			cout << "Error: sending error reply\n";
+			return -1;
+		}
+		
+		bzero(sendBuff, MAX_BUFF_SIZE);
+
 	}
 
-	if(!state)
-	{
-		theClient->setClientName(theName);
-		// think about uid
-	}
-	else
-	{
-	}
-
-	cout << theClient->getClientName() << " connected\n";
+	return 1;
 }
 
 
@@ -64,20 +164,24 @@ int main(int argc, char** argv)
 		return EXIT_FAILURE;
 	}
 	int port = atoi(argv[1]);
-	char rcv_buff[RCV_BUFF_SIZE] = {'\0'};
+	char rcv_buff[MAX_BUFF_SIZE] = {};
 	string rcvStr;
+	
+// TEST PURPOSE ONLY
+	CClient client1;
+	client1.setClientName("Linards");
+	CClient client2;
+	client2.setClientName("Apelsins");
+	client2.setLastRoom("Hardware");
 
-	list<CClient*> OnlineClients;
-	list<CClient*> OfflineClients;
-	list<CClient*>::iterator it_on;
-	list<CClient*>::iterator it_off;
-
+	OnlineClients.push_back(&client1);
+	OfflineClients.push_back(client2);
+// TEST PURPOSE ONLY ENDS
 
 	// Create and init the listen socket
 	Csocket server;
 	int listenfd = server.InitServer(port);	
 	int connfd, receive;
-	cout << "Descriptor created: " << listenfd << endl;
 	
 	int num_ready;
         struct epoll_event events[MAX_EPOLL_EVENTS];
@@ -112,12 +216,18 @@ int main(int argc, char** argv)
 					// Allocate new client
 					CClient* client = new CClient;
 					client->setSockfd(connfd);
-        				OnlineClients.push_back(client);
 
-					event.data.fd = client->getSockfd();
-					epoll_ctl(epfd, EPOLL_CTL_ADD, client->getSockfd(), &event);
+					event.data.fd = connfd; 
+					epoll_ctl(epfd, EPOLL_CTL_ADD, connfd, &event);
 
-					handleClientName(server, client, OfflineClients, it_off);
+					if(handleClientName(server, client, OnlineClients, it_on, OfflineClients, it_off) == -1 )
+					{
+						cout << "Error handling clients names\n";
+					}
+					else
+					{
+						cout << "Good\n";
+					}
 					
 					// Send room names
 					cout << "Connected\n";
@@ -131,18 +241,14 @@ int main(int argc, char** argv)
 			else
 			{
 				// Receive events
-				/*
-				cout << "descriptor: " << events[i].data.fd << endl;
-				cout << "Receiveign\n";
-				char number = server.ReceiveDataAck(events[i].data.fd, rcv_buff); 
-				cout << "Data received: " << rcv_buff << endl;
-				bzero(rcv_buff, RCV_BUFF_SIZE);
-				//close(events[i].data.fd);
-				*/
-
-				if (server.ReceiveMessage(events[i].data.fd, rcv_buff))
-					cout << "Received data: " << rcv_buff << endl;
+				if (server.ReceiveMessage(events[i].data.fd, rcv_buff) == -1)
+				{
+					cout << "Error: receiving  message\n";
+					return -1;
+				}
+				rcvStr = rcv_buff;
 				
+				handleReceiveMsg(rcvStr);	
 			}
 		}
 	}
