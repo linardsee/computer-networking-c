@@ -24,9 +24,9 @@ class Csocket
 		//Disconnect();
 		//char SendDataAck(int sockfd, char* buff, char seqNum);
 		//char ReceiveDataAck(int sockfd, char* buff);
-		int SendMessage(int sockfd, char* buff);
-		int ReceiveMessage(int sockfd, char* buff);
-		private:
+		static int SendMessage(int sockfd, char* buff);
+		static int ReceiveMessage(int sockfd, char* buff);
+	private:
 		struct sockaddr_in serv_addr;
 		struct sockaddr_in cli_addr;
 		struct timeval timeout;

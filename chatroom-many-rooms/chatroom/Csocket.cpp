@@ -161,6 +161,7 @@ int Csocket::Accept()
 
 int Csocket::SendMessage(int sockfd, char* buff)
 {
+	char ack;
 	int msgSent = 0;
 	uint8_t len[2] = {};
 	uint16_t length = strlen(buff);
@@ -175,12 +176,15 @@ int Csocket::SendMessage(int sockfd, char* buff)
 		if(msgSent == -1)
 			return -1;
 	}
-	
-	/*debug*/ cout << "Length sent\n";
-	cout << "length before reconstructing: " << length << endl;
+
+	if(recv(sockfd, &ack, 1, MSG_WAITALL) == -1)
+	{
+		cout << "Error: receiving ack\n";
+		return -1;
+	}
+
 	length = 0;
 	length |= (len[0] << 8) | len[1];
-	cout << "lenght after reconstructing: " << length << endl;
 	
 	msgSent = 0;
 
@@ -188,7 +192,6 @@ int Csocket::SendMessage(int sockfd, char* buff)
 	{
 		msgSent = send(sockfd, buff + length - msgLeft, strlen(buff + length - msgLeft), 0);
 		msgLeft -= msgSent;
-		
 		if(msgSent == -1)
 			return -1;
 	}
@@ -199,19 +202,30 @@ int Csocket::SendMessage(int sockfd, char* buff)
 int Csocket::ReceiveMessage(int sockfd, char* buff)
 {
 	int msgRcvd = 0;
+	int sent_ack = 0;
 	unsigned int msgLeft = 0;
 	uint8_t len[2] = {};
 	uint16_t length = 0;
 	char tempBuff[RCV_BUFF_SIZE] = {};
+	char ack;
 
-	msgRcvd = recv(sockfd, len, sizeof(len), MSG_WAITALL); // blocking function, returns only when all bytes have been received
+	msgRcvd = recv(sockfd, len, sizeof(len), 0); // blocking function, returns only when all bytes have been received
 	if(msgRcvd == -1)
 		return -1;
 	if(msgRcvd == 0)
 		return 0;
 
+	while(!sent_ack)
+	{
+		sent_ack = send(sockfd, &ack, 1, 0);
+		if(sent_ack == -1)
+		{
+			cout << "Error: unable to send ack\n";
+			return -1;
+		}
+	}
+
 	length |= (len[0] << 8) | len[1];
-	cout << "Length received: " << length << endl;
 	
 	msgRcvd = 0;
 	msgLeft = length;
@@ -223,7 +237,6 @@ int Csocket::ReceiveMessage(int sockfd, char* buff)
 			return -1;
 		if(msgRcvd == 0)
 			return 0;
-		
 		msgLeft -= msgRcvd;
 		strcat(buff, tempBuff);
 		bzero(tempBuff, RCV_BUFF_SIZE);

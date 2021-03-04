@@ -13,6 +13,9 @@
 
 using namespace std;
 
+/* Global variables */
+string currentRoom;
+
 
 void printStartWindow()
 {
@@ -49,7 +52,7 @@ void handleNameReply(string buff, string& theName, string& theRoomName)
 		cout << theName << "@" << theRoomName << ">" << flush;
 	}
 }
-
+/*
 int checkIfRequest(string str)
 {
 	int state = 0;
@@ -92,6 +95,146 @@ int checkIfRequest(string str)
 	}
 
 	return state;
+}
+*/
+
+
+int handleRequest(string str, int sockfd)
+{
+        int state = 0;
+        char buff[MAX_BUFF_SIZE] = {'\0'};
+        string inputStr, buffStr;
+        vector<char*> roomNames;
+
+        if(str.compare("JOIN") == 0)
+        {
+                cout << "Enter the room to join: ";
+                getline(cin, inputStr);
+
+                // First send command
+                stpcpy(buff, "JOIN");
+                if (Csocket::SendMessage(sockfd, buff) == -1)
+                {
+                        cout << "Error: sending command JOIN\n";
+                        return -1;
+                }
+                bzero(buff, MAX_BUFF_SIZE);
+                // After that send argument
+                stpcpy(buff, inputStr.c_str());
+                if (Csocket::SendMessage(sockfd, buff) == -1)
+                {
+                        cout << "Error: sending argument JOIN\n";
+                        return -1;
+                }
+                bzero(buff, MAX_BUFF_SIZE);
+
+                if( Csocket::ReceiveMessage(sockfd, buff) == -1)
+                {
+                        cout << "Error: receiving reply JOIN\n";
+                        return -1;
+                }
+
+                buffStr = buff;
+
+                if( buffStr.compare("ERROR") == 0)
+                {
+                        cout << "No such room, please enter valid room\n";
+                }
+                else if( buffStr.compare("OK") == 0)
+                {
+                        currentRoom = inputStr;
+                        state = 1;
+                }
+                else
+                {
+                        cout << "Error: unknown reply JOIN\n";
+                        state = 2;
+                }
+        }
+	else if(str.compare("CREATE") == 0)
+        {
+                cout << "Enter the room name to create: ";
+                getline(cin, inputStr);
+
+                stpcpy(buff, "CREATE");
+                if (Csocket::SendMessage(sockfd, buff) == -1)
+                {
+                        cout << "Error: sending command CREATE\n";
+                        return -1;
+                }
+                bzero(buff, MAX_BUFF_SIZE);
+                // After that send argument
+                stpcpy(buff, inputStr.c_str());
+                if (Csocket::SendMessage(sockfd, buff) == -1)
+                {
+                        cout << "Error: sending argument CREATE\n";
+                        return -1;
+                }
+                bzero(buff, MAX_BUFF_SIZE);
+
+                if( Csocket::ReceiveMessage(sockfd, buff) == -1)
+                {
+                        cout << "Error: receiving reply CREATE\n";
+                        return -1;
+                }
+
+                buffStr = buff;
+		cout << "Buffer received: " << buffStr << endl;
+
+                if( buffStr.compare("ERROR") == 0)
+                {
+                        cout << "Room already exists, please enter valid room name\n";
+                }
+                else if( buffStr.compare("OK") == 0)
+                {
+                        currentRoom = inputStr;
+                        state = 1;
+                }
+                else
+                {
+                        cout << "Error: unknown reply CREATE\n";
+                        state = 2;
+                }
+        }
+        else if(str.compare("SHOW") == 0)
+        {
+                stpcpy(buff, "SHOW");
+                if (Csocket::SendMessage(sockfd, buff) == -1)
+                {
+                        cout << "Error: sending command SHOW\n";
+                        return -1;
+                }
+                bzero(buff, MAX_BUFF_SIZE);
+
+                if( Csocket::ReceiveMessage(sockfd, buff) == -1)
+                {
+                        cout << "Error: receiving reply SHOW\n";
+                        return -1;
+                }
+
+                for(int i = 0; i < int(buff[0]); i++)
+                {
+                        if( Csocket::ReceiveMessage(sockfd, buff) == -1)
+                        {
+                                cout << "Error: receiving list SHOW\n";
+                                return -1;
+                        }
+                        roomNames.push_back(buff);
+                        bzero(buff, MAX_BUFF_SIZE);
+                }
+
+                cout << endl;
+                cout << "List of available rooms: \n";
+
+                for(int i = 0; i < roomNames.size(); i++)
+                {
+                        cout << roomNames[0] << endl;
+                }
+
+                cout << endl;
+        }
+
+        return state;
 }
 
 int main(int argc, char** argv)
@@ -167,36 +310,10 @@ int main(int argc, char** argv)
 				cout << "> ";
 				getline(cin, inputStr);
 				
-				req = checkIfRequest(inputStr);
-				if(req)
+				if (handleRequest(inputStr, sockfd))
 				{
-					switch(req)
-					{
-						case 1:
-							//  Exit routine
-						break;
-
-						case 2:
-							// JOIN routine
-						break;
-
-						case 3:
-							// SHOW_ROOMS routine
-						break;
-
-						case 4:
-							// CHANGE routine
-						break;
-
-						case 5:
-							// HELP routine
-						break;
-					}
-				}
-				else
-				{
-					// TEXT FOR CHAT
-				}
+					cout << "Requests handled\n";
+				}	
 			}
 		}
 	}
